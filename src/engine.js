@@ -4,11 +4,17 @@ export const ROUND_SECONDS = 45;
 
 const FIXED_STEP = 1 / 120;
 const SHOT_INTERVAL = 0.11;
-const BULLET_SPEED = 520;
-const RECOIL_IMPULSE = 42;
 const SHIP_MAX_SPEED = 210;
 const AIM_DISTANCE = 92;
 const BLOOM_LIFE = 8;
+const WAVE_DELAY = 0.65;
+const CORE_CONFIG = [
+  null,
+  { speed: 520, radius: 3, recoil: 42, pierce: 0, spread: [0] },
+  { speed: 550, radius: 3.4, recoil: 46, pierce: 0, spread: [0] },
+  { speed: 585, radius: 3.8, recoil: 50, pierce: 1, spread: [0] },
+  { speed: 625, radius: 4.4, recoil: 56, pierce: 0, spread: [-0.065, 0.065] },
+];
 
 function createRandom(seed) {
   let value = seed >>> 0;
@@ -51,6 +57,9 @@ export class SplatterdriftEngine {
     this.accumulator = 0;
     this.lives = 3;
     this.score = 0;
+    this.wave = 1;
+    this.waveDelay = 0;
+    this.betweenWaves = false;
     this.combo = 1;
     this.maxCombo = 1;
     this.lastHitAt = -999;
@@ -81,12 +90,19 @@ export class SplatterdriftEngine {
       destroyed: 0,
       collisions: 0,
       brakeEvents: 0,
+      wavesCleared: 0,
     };
-    this.asteroids = Array.from({ length: 6 }, (_, index) => {
-      const angle = (Math.PI * 2 * index) / 6 + random() * 0.26;
-      const distance = 136 + random() * 18;
-      const speed = 28 + random() * 26;
-      const drift = angle + Math.PI / 2 + (random() - 0.5) * 0.84;
+    this.asteroids = this.createWave(this.wave);
+  }
+
+  createWave(wave) {
+    const count = Math.min(3 + wave, 7);
+    const speedScale = Math.min(1 + (wave - 1) * 0.14, 1.56);
+    return Array.from({ length: count }, (_, index) => {
+      const angle = (Math.PI * 2 * index) / count + this.random() * 0.26;
+      const distance = 136 + this.random() * 18;
+      const speed = (28 + this.random() * 26) * speedScale;
+      const drift = angle + Math.PI / 2 + (this.random() - 0.5) * 0.84;
       return {
         id: this.nextId++,
         x: FIELD_W / 2 + Math.cos(angle) * distance,
@@ -95,8 +111,8 @@ export class SplatterdriftEngine {
         vy: Math.sin(drift) * speed,
         radius: 24,
         tier: 2,
-        rotation: random() * Math.PI * 2,
-        spin: (random() - 0.5) * 0.9,
+        rotation: this.random() * Math.PI * 2,
+        spin: (this.random() - 0.5) * 0.9 * speedScale,
         shape: index % 4,
       };
     });
@@ -140,6 +156,7 @@ export class SplatterdriftEngine {
       this.events.push({ type: "start" });
     }
     if (this.phase !== "playing") return;
+    if (this.waveDelay > 0) return;
     this.held = true;
     this.fire();
     this.shotCooldown = SHOT_INTERVAL;
@@ -162,31 +179,42 @@ export class SplatterdriftEngine {
       this.aimDirectionX = nx;
       this.aimDirectionY = ny;
     }
+    const coreLevel = this.combo;
+    const config = CORE_CONFIG[coreLevel];
     const colorHue = this.hue;
-    this.bullets.push({
-      id: this.nextId++,
-      x: this.ship.x + nx * 16,
-      y: this.ship.y + ny * 16,
-      vx: nx * BULLET_SPEED + this.ship.vx * 0.18,
-      vy: ny * BULLET_SPEED + this.ship.vy * 0.18,
-      life: 1.35,
-      angle: Math.atan2(ny, nx),
-      hue: colorHue,
-    });
-    this.ship.vx -= nx * RECOIL_IMPULSE;
-    this.ship.vy -= ny * RECOIL_IMPULSE;
+    for (const spread of config.spread) {
+      const angle = Math.atan2(ny, nx) + spread;
+      const shotX = Math.cos(angle);
+      const shotY = Math.sin(angle);
+      this.bullets.push({
+        id: this.nextId++,
+        x: this.ship.x + shotX * 16,
+        y: this.ship.y + shotY * 16,
+        vx: shotX * config.speed + this.ship.vx * 0.18,
+        vy: shotY * config.speed + this.ship.vy * 0.18,
+        life: coreLevel >= 3 ? 1.45 : 1.35,
+        angle,
+        hue: colorHue,
+        radius: config.radius,
+        pierce: config.pierce,
+        coreLevel,
+      });
+      this.events.push({
+        type: "shot",
+        x: this.ship.x,
+        y: this.ship.y,
+        nx: shotX,
+        ny: shotY,
+        speed: Math.hypot(this.ship.vx, this.ship.vy),
+        coreLevel,
+      });
+    }
+    this.ship.vx -= nx * config.recoil;
+    this.ship.vy -= ny * config.recoil;
     clampMagnitude(this.ship, SHIP_MAX_SPEED);
-    this.metrics.shots += 1;
-    this.shotsSinceHit += 1;
+    this.metrics.shots += config.spread.length;
+    this.shotsSinceHit += config.spread.length;
     if (this.shotsSinceHit >= 6) this.combo = 1;
-    this.events.push({
-      type: "shot",
-      x: this.ship.x,
-      y: this.ship.y,
-      nx,
-      ny,
-      speed: Math.hypot(this.ship.vx, this.ship.vy),
-    });
   }
 
   advance(delta) {
@@ -200,6 +228,7 @@ export class SplatterdriftEngine {
 
   step(dt) {
     this.elapsed += dt;
+    this.waveDelay = Math.max(0, this.waveDelay - dt);
     this.invulnerable = Math.max(0, this.invulnerable - dt);
     this.shotCooldown -= dt;
     if (this.held && this.shotCooldown <= 0) {
@@ -242,10 +271,24 @@ export class SplatterdriftEngine {
     this.resolveShipHits();
     this.updateBlooms(dt);
 
-    if (this.asteroids.length === 0) this.finish("won");
-    else if (this.elapsed >= ROUND_SECONDS) {
+    if (this.elapsed >= ROUND_SECONDS) {
       this.elapsed = ROUND_SECONDS;
       this.finish("time");
+    } else if (this.asteroids.length === 0 && !this.betweenWaves) {
+      this.metrics.wavesCleared += 1;
+      const bonus = 250 * this.wave;
+      this.score += bonus;
+      this.wave += 1;
+      this.waveDelay = WAVE_DELAY;
+      this.betweenWaves = true;
+      this.held = false;
+      this.bullets = [];
+      this.events.push({ type: "wave-clear", wave: this.wave - 1, nextWave: this.wave, bonus });
+    } else if (this.asteroids.length === 0 && this.betweenWaves && this.waveDelay === 0) {
+      this.waveDelay = 0;
+      this.asteroids = this.createWave(this.wave);
+      this.betweenWaves = false;
+      this.events.push({ type: "wave-start", wave: this.wave, targets: this.asteroids.length });
     }
   }
 
@@ -256,14 +299,17 @@ export class SplatterdriftEngine {
     for (const bullet of this.bullets) {
       for (const asteroid of this.asteroids) {
         if (deadAsteroids.has(asteroid.id)) continue;
-        if (Math.hypot(bullet.x - asteroid.x, bullet.y - asteroid.y) > asteroid.radius + 3) continue;
-        deadBullets.add(bullet.id);
+        if (Math.hypot(bullet.x - asteroid.x, bullet.y - asteroid.y) > asteroid.radius + bullet.radius) continue;
         deadAsteroids.add(asteroid.id);
         this.metrics.hits += 1;
         this.metrics.destroyed += 1;
         this.shotsSinceHit = 0;
+        const previousCombo = this.combo;
         this.combo = this.elapsed - this.lastHitAt <= 2 ? Math.min(4, this.combo + 1) : 1;
         this.maxCombo = Math.max(this.maxCombo, this.combo);
+        if (this.combo > previousCombo) {
+          this.events.push({ type: "core", level: this.combo, previous: previousCombo });
+        }
         this.lastHitAt = this.elapsed;
         const base = asteroid.tier === 2 ? 120 : 220;
         this.score += base * this.combo;
@@ -286,6 +332,7 @@ export class SplatterdriftEngine {
           ny: bullet.vy / Math.max(1, Math.hypot(bullet.vx, bullet.vy)),
           tier: asteroid.tier,
           combo: this.combo,
+          coreLevel: bullet.coreLevel,
           bloomId: bloom.id,
         });
         if (asteroid.tier === 2) {
@@ -296,8 +343,8 @@ export class SplatterdriftEngine {
               id: this.nextId++,
               x: asteroid.x + Math.cos(angle) * 12,
               y: asteroid.y + Math.sin(angle) * 12,
-              vx: Math.cos(angle) * 76,
-              vy: Math.sin(angle) * 76,
+              vx: Math.cos(angle) * 76 * Math.min(1 + (this.wave - 1) * 0.14, 1.56),
+              vy: Math.sin(angle) * 76 * Math.min(1 + (this.wave - 1) * 0.14, 1.56),
               radius: 13,
               tier: 1,
               rotation: asteroid.rotation + sign * 0.4,
@@ -306,7 +353,12 @@ export class SplatterdriftEngine {
             });
           }
         }
-        break;
+        if (bullet.pierce > 0) {
+          bullet.pierce -= 1;
+        } else {
+          deadBullets.add(bullet.id);
+          break;
+        }
       }
     }
     this.bullets = this.bullets.filter((bullet) => !deadBullets.has(bullet.id));
@@ -376,5 +428,9 @@ export class SplatterdriftEngine {
 
   get accuracy() {
     return this.metrics.shots === 0 ? 0 : this.metrics.hits / this.metrics.shots;
+  }
+
+  get coreLevel() {
+    return this.combo;
   }
 }

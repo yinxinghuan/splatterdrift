@@ -4,8 +4,10 @@
  */
 import "./style.css";
 import "./vendor/recoil-splatter-field.css";
+import "./aigram-bridge.js";
 import { SplatterdriftEngine, FIELD_H, FIELD_W } from "./engine.js";
 import { CanvasRenderer } from "./renderer.js";
+import { SplatterdriftLeaderboard } from "./leaderboard.js";
 import { RecoilSplatterField } from "./vendor/recoil-splatter-field.js";
 import { splatterAudio } from "./audio.js";
 import { t } from "./i18n.js";
@@ -37,6 +39,7 @@ function startProduct() {
     <main class="sd-shell">
       <header class="sd-header">
         <div class="sd-lockup"><small>${t("eyebrow")}</small><h1>${t("title")}</h1></div>
+        <button class="sd-champion" type="button" hidden></button>
         <div class="sd-stats" aria-live="polite">
           <span><b data-stat="time">45</b><small>${t("time")}</small></span>
           <span><b data-stat="lives">3</b><small>${t("integrity")}</small></span>
@@ -48,6 +51,11 @@ function startProduct() {
         <div class="sd-grid" aria-hidden="true"></div>
         <canvas class="sd-canvas" aria-hidden="true"></canvas>
         <div class="sd-combo" aria-live="polite"></div>
+        <div class="sd-core" aria-live="polite">
+          <span>${t("core")} <b data-core-level>×1</b></span>
+          <i></i><i></i><i></i><i></i>
+        </div>
+        <div class="sd-wave" aria-live="polite"></div>
         <div class="sd-hint">
           <strong>${t("hint")}</strong>
           <span>${t("hintBrake")}</span>
@@ -61,24 +69,46 @@ function startProduct() {
             <span><b data-result="combo">×1</b><small>${t("maxCombo")}</small></span>
             <span><b data-result="brakes">0</b><small>${t("brakes")}</small></span>
           </div>
-          <p><span>${t("best")}</span> <b data-result="best">0</b></p>
-          <button class="sd-replay" type="button">
-            <svg viewBox="0 0 36 20" aria-hidden="true">
-              <g class="sd-replay__recoil">
-                <path d="M2 10h5M4 6.5h2M4 13.5h2"/>
-                <circle cx="13" cy="10" r="4.5"/>
-                <path d="M17.5 10h4"/>
-              </g>
-              <g class="sd-replay__shot">
-                <path d="M22 10h5"/>
-                <circle cx="31.5" cy="10" r="1.5"/>
-              </g>
-            </svg>
-            <span>${t("replay")}</span>
-          </button>
+          <p class="sd-result__summary">
+            <span>${t("best")} <b data-result="best">0</b></span>
+            <span>${t("sectors")} <b data-result="waves">0</b></span>
+          </p>
+          <div class="sd-result__actions">
+            <button class="sd-replay" type="button">
+              <svg viewBox="0 0 36 20" aria-hidden="true">
+                <g class="sd-replay__recoil">
+                  <path d="M2 10h5M4 6.5h2M4 13.5h2"/>
+                  <circle cx="13" cy="10" r="4.5"/>
+                  <path d="M17.5 10h4"/>
+                </g>
+                <g class="sd-replay__shot">
+                  <path d="M22 10h5"/>
+                  <circle cx="31.5" cy="10" r="1.5"/>
+                </g>
+              </svg>
+              <span>${t("replay")}</span>
+            </button>
+            <button class="sd-result-rank" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 18h16M6 15V9m6 6V5m6 10v-3"/>
+                <circle cx="6" cy="7" r="1"/><circle cx="12" cy="3" r="1"/><circle cx="18" cy="10" r="1"/>
+              </svg>
+              <span>${t("viewLeaderboard")}</span>
+            </button>
+          </div>
         </section>
       </section>
       <section class="sd-unsupported" hidden>${t("unsupported")}</section>
+      <section class="sd-leaderboard" role="dialog" aria-modal="true" aria-labelledby="sd-leaderboard-title" hidden>
+        <div class="sd-leaderboard__panel">
+          <header>
+            <small>${t("leaderboardSub")}</small>
+            <h2 id="sd-leaderboard-title">${t("leaderboardTitle")}</h2>
+          </header>
+          <div class="sd-leaderboard__list"></div>
+          <button class="sd-leaderboard__close" type="button">${t("close")}</button>
+        </div>
+      </section>
     </main>`;
 
   if (!window.PointerEvent) {
@@ -92,14 +122,25 @@ function startProduct() {
   const canvas = app.querySelector(".sd-canvas");
   const hint = app.querySelector(".sd-hint");
   const combo = app.querySelector(".sd-combo");
+  const core = app.querySelector(".sd-core");
+  const coreLevel = app.querySelector("[data-core-level]");
+  const waveLabel = app.querySelector(".sd-wave");
   const result = app.querySelector(".sd-result");
   const replay = app.querySelector(".sd-replay");
   const engine = new SplatterdriftEngine(90317, { bloomLimit: reduced ? 8 : 12 });
   const renderer = new CanvasRenderer(canvas, engine, { reduced });
+  const leaderboard = new SplatterdriftLeaderboard({
+    champion: app.querySelector(".sd-champion"),
+    modal: app.querySelector(".sd-leaderboard"),
+    list: app.querySelector(".sd-leaderboard__list"),
+    close: app.querySelector(".sd-leaderboard__close"),
+    resultButton: app.querySelector(".sd-result-rank"),
+  });
   const touch = { session: null };
   let previous = performance.now();
   let hudAt = 0;
   let frame = 0;
+  let waveLabelTimer = 0;
 
   const stat = (name) => app.querySelector(`[data-stat="${name}"]`);
   const resultValue = (name) => app.querySelector(`[data-result="${name}"]`);
@@ -121,6 +162,7 @@ function startProduct() {
   function beginTouchFire(session) {
     if (touch.session !== session || session.firing) return;
     setTouchAim(session.x, session.y);
+    leaderboard.beginRun();
     engine.pointerDownDirection(engine.aimDirectionX, engine.aimDirectionY);
     session.firing = true;
     if (session.timer !== null) {
@@ -148,6 +190,7 @@ function startProduct() {
     const point = pointFromEvent(event);
     hint.classList.add("is-gone");
     if (event.pointerType !== "touch") {
+      leaderboard.beginRun();
       engine.pointerDownPoint(point.x, point.y);
       return;
     }
@@ -207,6 +250,7 @@ function startProduct() {
       event.preventDefault();
       splatterAudio.unlock();
       hint.classList.add("is-gone");
+      leaderboard.beginRun();
       engine.pointerDownDirection(engine.aimDirectionX, engine.aimDirectionY);
     }
   });
@@ -227,7 +271,10 @@ function startProduct() {
     clearTouch(false);
     engine.reset();
     renderer.reset();
+    leaderboard.resetRun();
     result.hidden = true;
+    core.hidden = false;
+    waveLabel.classList.remove("is-visible");
     hint.classList.remove("is-gone");
     combo.textContent = "";
     updateHud();
@@ -238,8 +285,12 @@ function startProduct() {
     stat("lives").textContent = String(engine.lives);
     stat("targets").textContent = String(engine.asteroids.length);
     stat("score").textContent = String(engine.score);
+    coreLevel.textContent = `×${engine.coreLevel}`;
+    [...core.querySelectorAll("i")].forEach((segment, index) => {
+      segment.classList.toggle("is-active", index < engine.coreLevel);
+    });
     app.querySelector(".sd-shell").classList.toggle("is-danger", engine.lives === 1);
-    if (engine.combo > 1 && engine.phase === "playing") {
+    if (engine.combo > 1 && engine.phase === "playing" && !engine.betweenWaves) {
       combo.textContent = `×${engine.combo}`;
       const scale = field.clientWidth / FIELD_W;
       combo.style.setProperty("--combo-x", `${engine.ship.x * scale}px`);
@@ -262,8 +313,12 @@ function startProduct() {
     resultValue("accuracy").textContent = `${Math.round(engine.accuracy * 100)}%`;
     resultValue("combo").textContent = `×${engine.maxCombo}`;
     resultValue("brakes").textContent = String(engine.metrics.brakeEvents);
+    resultValue("waves").textContent = String(engine.metrics.wavesCleared);
     resultValue("best").textContent = String(best);
+    core.hidden = true;
+    waveLabel.classList.remove("is-visible");
     result.hidden = false;
+    leaderboard.submit(engine.score);
   }
 
   function handleEvents(events) {
@@ -277,6 +332,19 @@ function startProduct() {
       if (event.type === "brake") {
         splatterAudio.brake();
         if (navigator.vibrate) navigator.vibrate(12);
+      }
+      if (event.type === "core") {
+        splatterAudio.core(event.level);
+        core.classList.remove("is-rise");
+        void core.offsetWidth;
+        core.classList.add("is-rise");
+      }
+      if (event.type === "wave-clear") {
+        splatterAudio.wave();
+        waveLabel.textContent = `${t("sector")} ${String(event.nextWave).padStart(2, "0")}`;
+        waveLabel.classList.add("is-visible");
+        window.clearTimeout(waveLabelTimer);
+        waveLabelTimer = window.setTimeout(() => waveLabel.classList.remove("is-visible"), 620);
       }
       if (event.type === "collision") splatterAudio.collision(event.lives <= 0);
       if (event.type === "finish") {
@@ -308,5 +376,5 @@ function startProduct() {
   window.addEventListener("pagehide", () => {
     cancelAnimationFrame(frame);
   }, { once: true });
-  window.__SPLATTERDRIFT__ = { baseline: false, engine, renderer, field };
+  window.__SPLATTERDRIFT__ = { baseline: false, engine, renderer, leaderboard, field };
 }

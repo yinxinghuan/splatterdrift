@@ -5,9 +5,17 @@ Visual mechanism adapted from **“css splatters (click for craze)”** by
 MIT License. See `public/THIRD_PARTY_NOTICES.txt`.
 
 A 45-second touch-first Asteroids variant where firing is the only propulsion.
-The product layer uses a pooled Canvas particle field: recoil draws the route,
-directional hit debris exposes impact, and collectible particle vortices cut
-momentum. The original DOM/CSS mechanism remains isolated at `?baseline=1`.
+Consecutive hits upgrade the CORE from a stronger single shot to piercing and
+twin-shot configurations; clearing a sector creates a brief breath before a
+denser, faster wave. The product layer uses a pooled Canvas particle field:
+recoil draws the route, directional hit debris exposes impact, and collectible
+particle vortices cut momentum. The original DOM/CSS mechanism remains isolated
+at `?baseline=1`.
+
+AlterU sessions also receive a score leaderboard. Other players appear with
+avatar and name and can open their Aigram profile; the current player is marked
+as `YOU`. External visitors see an AlterU download entry instead of a false
+platform identity.
 
 ## Local development
 
@@ -20,4 +28,5 @@ npm run dev -- --host 127.0.0.1
 - Mechanical visual baseline: `/?baseline=1`
 - Engine verification: `npm run verify`
 
-The game is a portable Vite project with `base: './'`.
+The game is a portable Vite project with `base: './'`. Official poster
+provenance is recorded in `_production/poster-source.json`.

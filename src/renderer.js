@@ -73,6 +73,7 @@ export class CanvasRenderer {
       if (event.type === "expire") this.spawnExpire(event);
       if (event.type === "brake") this.spawnBrake(event);
       if (event.type === "collision") this.spawnCollision();
+      if (event.type === "wave-clear") this.spawnWaveClear();
     }
   }
 
@@ -88,8 +89,9 @@ export class CanvasRenderer {
   }
 
   spawnShot(event) {
-    const sparkCount = this.reduced ? 2 : 4;
-    const pressureCount = this.reduced ? 4 : 7;
+    const levelBoost = Math.max(0, (event.coreLevel || 1) - 1);
+    const sparkCount = (this.reduced ? 2 : 4) + Math.ceil(levelBoost * 0.7);
+    const pressureCount = (this.reduced ? 4 : 7) + levelBoost;
     for (let index = 0; index < sparkCount; index += 1) {
       const tangent = (Math.random() - 0.5) * 0.36;
       this.acquire({
@@ -122,6 +124,35 @@ export class CanvasRenderer {
     }
     this.muzzleFlash = 0.09;
     this.waves.push({ x: event.x, y: event.y, life: 0.18, maxLife: 0.18, radius: 8, color: ION_CYAN });
+  }
+
+  spawnWaveClear() {
+    const count = this.reduced ? 18 : 34;
+    for (let index = 0; index < count; index += 1) {
+      const angle = (Math.PI * 2 * index) / count + Math.random() * 0.12;
+      const radius = 12 + Math.random() * 26;
+      const speed = 55 + Math.random() * 95;
+      this.acquire({
+        kind: "spark",
+        x: FIELD_W / 2 + Math.cos(angle) * radius,
+        y: FIELD_H / 2 + Math.sin(angle) * radius,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 0.32 + Math.random() * 0.34,
+        size: 0.65 + Math.random() * 0.9,
+        drag: 2.6,
+        rotation: angle,
+        spin: 0,
+      });
+    }
+    this.waves.push({
+      x: FIELD_W / 2,
+      y: FIELD_H / 2,
+      life: 0.5,
+      maxLife: 0.5,
+      radius: 18,
+      color: ION_WHITE,
+    });
   }
 
   spawnHit(event) {
@@ -417,19 +448,29 @@ export class CanvasRenderer {
       const length = Math.max(1, Math.hypot(bullet.vx, bullet.vy));
       const nx = bullet.vx / length;
       const ny = bullet.vy / length;
+      const core = bullet.coreLevel || 1;
+      const trailLength = 13 + core * 2.5;
       context.beginPath();
-      context.moveTo(bullet.x - nx * 15, bullet.y - ny * 15);
+      context.moveTo(bullet.x - nx * trailLength, bullet.y - ny * trailLength);
       context.lineTo(bullet.x, bullet.y);
-      context.strokeStyle = "rgba(120,215,229,0.2)";
-      context.lineWidth = 3.2;
+      context.strokeStyle = `rgba(120,215,229,${0.14 + core * 0.035})`;
+      context.lineWidth = 2.5 + core * 0.45;
       context.lineCap = "round";
       context.stroke();
       context.beginPath();
-      context.moveTo(bullet.x - nx * 9, bullet.y - ny * 9);
+      context.moveTo(bullet.x - nx * (7 + core * 1.6), bullet.y - ny * (7 + core * 1.6));
       context.lineTo(bullet.x, bullet.y);
       context.strokeStyle = ION_WHITE;
-      context.lineWidth = 1.25;
+      context.lineWidth = 0.85 + bullet.radius * 0.13;
       context.stroke();
+      if (core === 3) {
+        context.beginPath();
+        context.moveTo(bullet.x - nx * 4 - ny * 1.7, bullet.y - ny * 4 + nx * 1.7);
+        context.lineTo(bullet.x + ny * 1.7, bullet.y - nx * 1.7);
+        context.strokeStyle = "rgba(216,251,255,0.62)";
+        context.lineWidth = 0.75;
+        context.stroke();
+      }
     }
     context.restore();
   }

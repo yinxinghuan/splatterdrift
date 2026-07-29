@@ -49,6 +49,17 @@ class SplatterAudio {
     this.tone(520, 0.11, 0.03, "sine", 0.6);
   }
 
+  core(level) {
+    const frequency = [0, 0, 620, 740, 880][level] || 620;
+    this.tone(frequency, 0.07, 0.018, "sine", 1.08, 0.035);
+  }
+
+  wave() {
+    [330, 440, 660].forEach((frequency, index) => {
+      this.tone(frequency, 0.16, 0.026, "triangle", 1.04, index * 0.045);
+    });
+  }
+
   collision(ended) {
     this.tone(96, 0.16, 0.04, "sawtooth", 0.44);
     if (ended) this.tone(52, 0.28, 0.035, "sine", 0.72, 0.08);

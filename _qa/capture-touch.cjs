@@ -3,7 +3,7 @@ const path = require("node:path");
 const { chromium } = require("playwright");
 
 const root = "/Users/yin/code/games/splatterdrift";
-const url = "http://127.0.0.1:5174/";
+const url = process.env.SD_QA_URL || "http://127.0.0.1:5174/";
 
 async function dispatchTouch(client, type, x, y) {
   await client.send("Input.dispatchTouchEvent", {
@@ -27,6 +27,10 @@ async function runViewport(browser, width, height, pass) {
     deviceScaleFactor: 1,
     reducedMotion: "no-preference",
   });
+  await context.route("https://images.aiwaves.tech/alteru/guest-shell.js", (route) => route.fulfill({
+    contentType: "application/javascript",
+    body: "/* QA platform bridge: guest shell is absent inside AlterU. */",
+  }));
   const page = await context.newPage();
   const errors = [];
   page.on("console", (message) => {
@@ -49,6 +53,7 @@ async function runViewport(browser, width, height, pass) {
   }));
   assert.ok(metrics.bodyWidth <= metrics.viewportWidth);
   assert.ok(metrics.field.top >= 0 && metrics.field.bottom <= height);
+  assert.equal(await page.locator(".sd-champion").isHidden(), true);
 
   await page.screenshot({
     path: path.join(root, `_qa/ui/${pass}-platform-layout-idle-${width}x${height}.png`),
@@ -143,7 +148,7 @@ async function runViewport(browser, width, height, pass) {
     engine.ship.vy = 0;
     return { vx: engine.ship.vx, brakeEvents: engine.metrics.brakeEvents };
   });
-  await page.waitForTimeout(35);
+  await page.waitForTimeout(110);
   const afterBrake = await page.evaluate(() => {
     const engine = window.__SPLATTERDRIFT__.engine;
     return {
@@ -164,17 +169,96 @@ async function runViewport(browser, width, height, pass) {
 
   await page.evaluate(() => {
     const engine = window.__SPLATTERDRIFT__.engine;
+    engine.combo = 4;
+    engine.lastHitAt = engine.elapsed;
+    engine.shotsSinceHit = 0;
+    engine.invulnerable = 1;
+    engine.ship.x = 180;
+    engine.ship.y = 260;
+    engine.ship.vx = 0;
+    engine.ship.vy = 0;
+    engine.fire();
+  });
+  await page.waitForTimeout(110);
+  const coreGrowth = await page.evaluate(() => {
+    const engine = window.__SPLATTERDRIFT__.engine;
+    return {
+      core: engine.coreLevel,
+      bullets: engine.bullets.length,
+      recoil: Math.hypot(engine.ship.vx, engine.ship.vy),
+      label: document.querySelector("[data-core-level]").textContent,
+    };
+  });
+  assert.equal(coreGrowth.core, 4);
+  assert.ok(coreGrowth.bullets >= 2);
+  assert.equal(coreGrowth.label, "×4");
+  if (width === 390) {
+    await page.screenshot({
+      path: path.join(root, `_qa/ui/${pass}-platform-layout-core-x4-${width}x${height}.png`),
+      fullPage: true,
+    });
+  }
+
+  await page.evaluate(() => {
+    const engine = window.__SPLATTERDRIFT__.engine;
+    engine.held = false;
+    engine.bullets = [];
+    engine.blooms = [];
+    engine.asteroids = [];
+  });
+  await page.waitForTimeout(80);
+  const waveClear = await page.evaluate(() => {
+    const engine = window.__SPLATTERDRIFT__.engine;
+    return {
+      wave: engine.wave,
+      wavesCleared: engine.metrics.wavesCleared,
+      delay: engine.waveDelay,
+      labelVisible: document.querySelector(".sd-wave").classList.contains("is-visible"),
+    };
+  });
+  assert.equal(waveClear.wave, 2);
+  assert.equal(waveClear.wavesCleared, 1);
+  assert.ok(waveClear.delay > 0);
+  assert.equal(waveClear.labelVisible, true);
+  if (width === 390) {
+    await page.screenshot({
+      path: path.join(root, `_qa/ui/${pass}-platform-layout-wave-clear-${width}x${height}.png`),
+      fullPage: true,
+    });
+  }
+  await page.waitForTimeout(650);
+  const waveStart = await page.evaluate(() => {
+    const engine = window.__SPLATTERDRIFT__.engine;
+    return { wave: engine.wave, targets: engine.asteroids.length, betweenWaves: engine.betweenWaves };
+  });
+  assert.deepEqual(waveStart, { wave: 2, targets: 5, betweenWaves: false });
+
+  await page.evaluate(() => {
+    const engine = window.__SPLATTERDRIFT__.engine;
     engine.finish("time");
   });
   await page.waitForTimeout(100);
   const resultBox = await page.locator(".sd-result").boundingBox();
   const replayBox = await page.locator(".sd-replay").boundingBox();
+  const rankBox = await page.locator(".sd-result-rank").boundingBox();
   assert.ok(resultBox);
   assert.ok(replayBox && replayBox.width >= 44 && replayBox.height >= 44);
+  assert.ok(rankBox && rankBox.width >= 44 && rankBox.height >= 44);
   await page.screenshot({
     path: path.join(root, `_qa/ui/${pass}-platform-layout-result-${width}x${height}.png`),
     fullPage: true,
   });
+
+  await page.locator(".sd-result-rank").click();
+  assert.equal(await page.locator(".sd-leaderboard").isVisible(), true);
+  assert.equal(await page.locator(".sd-leaderboard__download a").getAttribute("href"), "https://alteru.app");
+  if (width === 390) {
+    await page.screenshot({
+      path: path.join(root, `_qa/ui/${pass}-platform-layout-leaderboard-download-${width}x${height}.png`),
+      fullPage: true,
+    });
+  }
+  await page.locator(".sd-leaderboard__close").click();
 
   const stress = await page.evaluate(async ({ compact }) => {
     const renderer = window.__SPLATTERDRIFT__.renderer;
@@ -218,22 +302,168 @@ async function runViewport(browser, width, height, pass) {
 
   assert.deepEqual(errors, []);
   await context.close();
-  return { width, height, beforeArm, playState, beforeBrake, afterBrake, stress, replayState, metrics };
+  return {
+    width,
+    height,
+    beforeArm,
+    playState,
+    beforeBrake,
+    afterBrake,
+    coreGrowth,
+    waveClear,
+    waveStart,
+    stress,
+    replayState,
+    metrics,
+  };
+}
+
+async function runLeaderboardViewport(browser, width, height, pass) {
+  const context = await browser.newContext({
+    viewport: { width, height },
+    hasTouch: true,
+    isMobile: true,
+    deviceScaleFactor: 1,
+  });
+  await context.route("https://images.aiwaves.tech/alteru/guest-shell.js", (route) => route.fulfill({
+    contentType: "application/javascript",
+    body: "/* QA platform bridge: guest shell is absent inside AlterU. */",
+  }));
+  await context.addInitScript(() => {
+    window.__qaApiCalls = [];
+    window.__qaSelfScore = 200;
+    const decode = (value) => decodeURIComponent(escape(atob(value)));
+    const encode = (value) => btoa(unescape(encodeURIComponent(value)));
+    const avatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='40' height='40' fill='%2378d7e5'/%3E%3Ccircle cx='20' cy='15' r='7' fill='%2311161a'/%3E%3Cpath d='M7 38c2-10 8-14 13-14s11 4 13 14' fill='%2311161a'/%3E%3C/svg%3E";
+    window.addEventListener("message", (event) => {
+      if (typeof event.data !== "string") return;
+      if (event.data.startsWith("AW.PROFILE.OPEN-")) {
+        window.__qaApiCalls.push({ aw: event.data });
+        return;
+      }
+      if (!event.data.startsWith("callAPI-")) return;
+      const request = JSON.parse(decode(event.data.slice("callAPI-".length)));
+      window.__qaApiCalls.push(request);
+      if (request.url.includes("/rank/score/save")) {
+        window.__qaSelfScore = Number(request.data?.score) || 0;
+      }
+      const updated = window.__qaSelfScore > 900;
+      const rows = updated
+        ? [
+          { user_id: "100", user_name: "Pilot One", head_url: "", score: String(window.__qaSelfScore), rank: 1 },
+          { user_id: "900", user_name: "Nova Vector With A Long Name", head_url: avatar, score: "900", rank: 2 },
+          { user_id: "600", user_name: "Kite", head_url: "", score: "600", rank: 3 },
+        ]
+        : [
+          { user_id: "900", user_name: "Nova Vector With A Long Name", head_url: avatar, score: "900", rank: 1 },
+          { user_id: "600", user_name: "Kite", head_url: "", score: "600", rank: 2 },
+          { user_id: "100", user_name: "Pilot One", head_url: "", score: "200", rank: 3 },
+        ];
+      const data = request.url.includes("/rank/score/list/")
+        ? { retcode: 0, data: rows }
+        : { retcode: 0, data: true };
+      const response = {
+        request_id: request.request_id,
+        success: true,
+        data,
+      };
+      window.postMessage(`callAPIResult-${encode(JSON.stringify(response))}`, location.origin);
+    });
+  });
+
+  const page = await context.newPage();
+  const platformOrigin = new URL(url).origin;
+  const platformUrl = `${url}?api_origin=${encodeURIComponent(platformOrigin)}&telegram_id=100`;
+  await page.goto(platformUrl, { waitUntil: "networkidle" });
+  await page.waitForFunction(() => document.querySelector(".sd-champion__name")?.textContent.includes("Nova"));
+  assert.equal(await page.locator(".sd-champion").isVisible(), true);
+  assert.equal(await page.locator(".sd-champion__avatar img").count(), 1);
+  await page.locator(".sd-champion").click();
+  await page.waitForFunction(() => document.querySelectorAll(".sd-leaderboard__row").length === 3);
+  assert.equal(await page.locator(".sd-leaderboard__row").count(), 3);
+  assert.equal(await page.locator(".sd-leaderboard__row.is-self").count(), 1);
+  assert.equal(await page.locator("button.sd-leaderboard__row").count(), 2);
+  const panelBox = await page.locator(".sd-leaderboard__panel").boundingBox();
+  assert.ok(panelBox && panelBox.y >= 0 && panelBox.y + panelBox.height <= height);
+  await page.screenshot({
+    path: path.join(root, `_qa/ui/${pass}-platform-layout-leaderboard-${width}x${height}.png`),
+    fullPage: true,
+  });
+
+  await page.locator("button.sd-leaderboard__row").first().click();
+  await page.waitForFunction(() => window.__qaApiCalls.some((call) => call.aw?.startsWith("AW.PROFILE.OPEN-")));
+  await page.locator(".sd-leaderboard__close").click();
+
+  await page.evaluate(() => {
+    const game = window.__SPLATTERDRIFT__;
+    game.leaderboard.beginRun();
+    game.engine.score = 1000;
+    game.engine.finish("time");
+  });
+  await page.waitForFunction(() => window.__qaApiCalls.some((call) => (
+    call.url === "/note/aigram/ai/game/record/play"
+    && call.data?.event === "score_beat"
+  )));
+  const apiEvidence = await page.evaluate(() => {
+    const calls = window.__qaApiCalls;
+    const save = calls.find((call) => call.url?.includes("/rank/score/save"));
+    const notify = calls.find((call) => (
+      call.url === "/note/aigram/ai/game/record/play"
+      && call.data?.event === "score_beat"
+    ));
+    return {
+      saveScore: save?.data?.score,
+      notifyTarget: notify?.data?.config_json?.actions?.[0]?.target_user_id,
+      notifyActions: notify?.data?.config_json?.actions?.length,
+      profileOpen: calls.some((call) => call.aw?.startsWith("AW.PROFILE.OPEN-")),
+    };
+  });
+  assert.deepEqual(apiEvidence, {
+    saveScore: 1000,
+    notifyTarget: "900",
+    notifyActions: 1,
+    profileOpen: true,
+  });
+  await page.screenshot({
+    path: path.join(root, `_qa/ui/${pass}-platform-layout-ranked-result-${width}x${height}.png`),
+    fullPage: true,
+  });
+  await context.close();
+  return { width, height, apiEvidence };
 }
 
 ;(async () => {
   const pass = process.argv[2] || "first";
+  const mode = process.argv[3] || "all";
   const browser = await chromium.launch({ headless: true });
   try {
-    const results = [
-      await runViewport(browser, 390, 844, pass),
-      await runViewport(browser, 320, 568, pass),
-    ];
+    const results = [];
+    if (mode === "all" || mode === "game" || mode === "game390") {
+      results.push(await runViewport(browser, 390, 844, pass));
+    }
+    if (mode === "all" || mode === "game" || mode === "game320") {
+      results.push(await runViewport(browser, 320, 568, pass));
+    }
+    const leaderboardResults = [];
+    if (mode === "all" || mode === "leaderboard" || mode === "lb390") {
+      leaderboardResults.push(await runLeaderboardViewport(browser, 390, 844, pass));
+    }
+    if (mode === "all" || mode === "leaderboard" || mode === "lb320") {
+      leaderboardResults.push(await runLeaderboardViewport(browser, 320, 568, pass));
+    }
+    if (mode !== "all" && mode !== "aux") {
+      console.log(JSON.stringify({ results, leaderboardResults }, null, 2));
+      return;
+    }
     const baselineContext = await browser.newContext({
       viewport: { width: 390, height: 844 },
       hasTouch: true,
       isMobile: true,
     });
+    await baselineContext.route("https://images.aiwaves.tech/alteru/guest-shell.js", (route) => route.fulfill({
+      contentType: "application/javascript",
+      body: "/* QA platform bridge: guest shell is absent inside AlterU. */",
+    }));
     const baselinePage = await baselineContext.newPage();
     await baselinePage.goto(`${url}?baseline=1`, { waitUntil: "networkidle" });
     assert.ok(await baselinePage.locator(".rsf-player").count());
@@ -256,6 +486,10 @@ async function runViewport(browser, width, height, pass) {
       hasTouch: true,
       isMobile: true,
     });
+    await zhContext.route("https://images.aiwaves.tech/alteru/guest-shell.js", (route) => route.fulfill({
+      contentType: "application/javascript",
+      body: "/* QA platform bridge: guest shell is absent inside AlterU. */",
+    }));
     const zhPage = await zhContext.newPage();
     await zhPage.goto(url, { waitUntil: "networkidle" });
     await zhPage.evaluate(() => localStorage.setItem("game_locale", "zh"));
@@ -281,8 +515,10 @@ async function runViewport(browser, width, height, pass) {
       isMobile: true,
     });
     const externalPage = await externalContext.newPage();
-    await externalPage.goto(url, { waitUntil: "networkidle" });
+    await externalPage.goto(url, { waitUntil: "domcontentloaded" });
+    await externalPage.locator("#alteru-guest-banner").waitFor({ state: "attached", timeout: 12000 });
     assert.ok(await externalPage.locator("#alteru-guest-banner").count());
+    assert.equal(await externalPage.locator(".sd-champion").isHidden(), true);
     const externalField = await externalPage.locator(".sd-field").boundingBox();
     await externalPage.screenshot({
       path: path.join(root, `_qa/ui/${pass}-external-guest-idle-390x844.png`),
@@ -290,7 +526,7 @@ async function runViewport(browser, width, height, pass) {
     });
     assert.ok(externalField && externalField.y + externalField.height > 0 && externalField.y < 844);
     await externalContext.close();
-    console.log(JSON.stringify(results, null, 2));
+    console.log(JSON.stringify({ results, leaderboardResults }, null, 2));
   } finally {
     await browser.close();
   }

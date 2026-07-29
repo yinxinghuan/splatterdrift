@@ -87,6 +87,52 @@ collision.advance(1 / 60);
 assert.equal(collision.lives, 2);
 assert.equal(collision.metrics.collisions, 1);
 
+const coreBase = new SplatterdriftEngine(65);
+coreBase.pointerDownDirection(1, 0);
+const baseRecoil = Math.abs(coreBase.ship.vx);
+assert.equal(coreBase.bullets.length, 1);
+
+const coreFour = new SplatterdriftEngine(66);
+coreFour.combo = 4;
+coreFour.pointerDownDirection(1, 0);
+assert.equal(coreFour.bullets.length, 2, "CORE x4 must emit a narrow twin shot");
+assert.ok(Math.abs(coreFour.ship.vx) > baseRecoil, "CORE growth must increase recoil risk");
+assert.ok(coreFour.bullets.every((bullet) => bullet.radius === 4.4));
+assert.ok(coreFour.bullets[0].angle < coreFour.bullets[1].angle);
+
+const pierce = new SplatterdriftEngine(67);
+pierce.combo = 3;
+pierce.ship.x = 100;
+pierce.ship.y = 260;
+pierce.asteroids = [180, 245].map((x, index) => ({
+  id: 720 + index,
+  x,
+  y: 260,
+  vx: 0,
+  vy: 0,
+  radius: 13,
+  tier: 1,
+  rotation: 0,
+  spin: 0,
+  shape: index,
+}));
+pierce.pointerDownDirection(1, 0);
+pierce.pointerUp();
+advanceFor(pierce, 0.38, 60);
+assert.equal(pierce.metrics.hits, 2, "CORE x3 focused shot must pierce one extra target");
+
+const waves = new SplatterdriftEngine(68);
+waves.phase = "playing";
+waves.asteroids = [];
+waves.advance(1 / 120);
+assert.equal(waves.metrics.wavesCleared, 1);
+assert.equal(waves.wave, 2);
+assert.equal(waves.asteroids.length, 0);
+assert.ok(waves.waveDelay > 0);
+advanceFor(waves, 0.7, 120);
+assert.equal(waves.asteroids.length, 5, "wave two must add one large asteroid");
+assert.equal(waves.betweenWaves, false);
+
 const engine60 = new SplatterdriftEngine(75);
 const engine30 = new SplatterdriftEngine(75);
 engine60.pointerDownDirection(0.8, -0.2);
@@ -120,5 +166,8 @@ console.log({
   recoilVx: recoil.ship.vx,
   splitTargets: split.asteroids.length,
   bloomBrakeVx: brake.ship.vx,
+  coreFourProjectiles: coreFour.bullets.length,
+  piercingHits: pierce.metrics.hits,
+  waveTwoTargets: waves.asteroids.length,
   deterministicShots: engine60.metrics.shots,
 });
