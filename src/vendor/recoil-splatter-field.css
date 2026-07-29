@@ -1,0 +1,42 @@
+.rsf-object {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  will-change: transform;
+  transform:
+    translate(-50%, -50%)
+    translate(var(--rsf-x, 0), var(--rsf-y, 0))
+    rotate(var(--rsf-r, 0deg));
+}
+
+.rsf-player {
+  width: 32px;
+  height: 32px;
+  border: 4px solid var(--rsf-color, #fff);
+  border-radius: 50%;
+}
+
+.rsf-projectile {
+  width: 6px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--rsf-color, #fff);
+}
+
+.rsf-particle,
+.rsf-residue {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--rsf-color, #fff);
+  transform:
+    translate(-50%, -50%)
+    translate(var(--rsf-x, 0), var(--rsf-y, 0))
+    rotate(var(--rsf-r, 0deg))
+    scale(var(--rsf-scale, 1));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rsf-object { transition: none; }
+}
