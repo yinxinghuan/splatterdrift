@@ -84,7 +84,7 @@ function startProduct() {
   const combo = app.querySelector(".sd-combo");
   const result = app.querySelector(".sd-result");
   const replay = app.querySelector(".sd-replay");
-  const engine = new SplatterdriftEngine();
+  const engine = new SplatterdriftEngine(90317, { bloomLimit: reduced ? 8 : 12 });
   const renderer = new DomRenderer(world, engine, { reduced });
   const touch = { session: null };
   let previous = performance.now();

@@ -9,7 +9,6 @@ const RECOIL_IMPULSE = 42;
 const SHIP_MAX_SPEED = 210;
 const AIM_DISTANCE = 92;
 const BLOOM_LIFE = 8;
-const BLOOM_LIMIT = 12;
 
 function createRandom(seed) {
   let value = seed >>> 0;
@@ -38,8 +37,9 @@ function wrap(body, margin = 0) {
 }
 
 export class SplatterdriftEngine {
-  constructor(seed = 90317) {
+  constructor(seed = 90317, options = {}) {
     this.seed = seed;
+    this.bloomLimit = options.bloomLimit ?? 12;
     this.reset(seed);
   }
 
@@ -270,7 +270,7 @@ export class SplatterdriftEngine {
           hue: bullet.hue,
         };
         this.blooms.push(bloom);
-        while (this.blooms.length > BLOOM_LIMIT) this.blooms.shift();
+        while (this.blooms.length > this.bloomLimit) this.blooms.shift();
         this.events.push({
           type: "hit",
           x: bullet.x,

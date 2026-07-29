@@ -47,7 +47,7 @@ CSS 场地按视口缩放，指针坐标通过实际 `getBoundingClientRect()` �
 
 命中事件由 renderer 生成有限粒子，粒子衰减后短暂沉淀；引擎同时生成一个有 8 秒
 寿命的制动花。飞船进入 29px 判定范围后速度乘 0.48。标准档视觉对象上限 160，
-窄屏/reduced-motion 上限 90；制动花最多 12。`?baseline=1` 直接运行
+窄屏/reduced-motion 上限 90；制动花标准档最多 12、窄屏/低动态档最多 8。`?baseline=1` 直接运行
 `RecoilSplatterField` 的边界爆裂和残留机制。
 
 ### 音频、多语言与存储
