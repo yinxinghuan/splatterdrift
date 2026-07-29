@@ -16,7 +16,7 @@ const copy = {
     maxCombo: "最高连击",
     brakes: "主动制动",
     best: "最高分",
-    replay: "再漂一次",
+    replay: "再次入轨",
     unsupported: "当前浏览器不支持 Pointer Events，无法安全运行这款触控游戏。",
   },
   en: {
@@ -36,7 +36,7 @@ const copy = {
     maxCombo: "MAX CHAIN",
     brakes: "BRAKES",
     best: "BEST",
-    replay: "DRIFT AGAIN",
+    replay: "RE-ENTER ORBIT",
     unsupported: "This browser does not support Pointer Events, so touch control cannot run safely.",
   },
 };

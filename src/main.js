@@ -63,8 +63,18 @@ function startProduct() {
           </div>
           <p><span>${t("best")}</span> <b data-result="best">0</b></p>
           <button class="sd-replay" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 8.5V4m0 0H9M4.5 4l3.1 3.1A7.2 7.2 0 1 1 5 13"/></svg>
-            ${t("replay")}
+            <svg viewBox="0 0 36 20" aria-hidden="true">
+              <g class="sd-replay__recoil">
+                <path d="M2 10h5M4 6.5h2M4 13.5h2"/>
+                <circle cx="13" cy="10" r="4.5"/>
+                <path d="M17.5 10h4"/>
+              </g>
+              <g class="sd-replay__shot">
+                <path d="M22 10h5"/>
+                <circle cx="31.5" cy="10" r="1.5"/>
+              </g>
+            </svg>
+            <span>${t("replay")}</span>
           </button>
         </section>
       </section>

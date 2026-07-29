@@ -209,9 +209,16 @@ async function runViewport(browser, width, height, pass) {
   assert.ok(stress.peakParticleCount <= (width <= 320 ? 220 : 420));
   assert.ok(stress.p95Ms < 28, `p95 frame interval ${stress.p95Ms}ms is too high`);
 
+  await page.locator(".sd-replay").click();
+  const replayState = await page.evaluate(() => ({
+    phase: window.__SPLATTERDRIFT__.engine.phase,
+    resultHidden: document.querySelector(".sd-result").hidden,
+  }));
+  assert.deepEqual(replayState, { phase: "ready", resultHidden: true });
+
   assert.deepEqual(errors, []);
   await context.close();
-  return { width, height, beforeArm, playState, beforeBrake, afterBrake, stress, metrics };
+  return { width, height, beforeArm, playState, beforeBrake, afterBrake, stress, replayState, metrics };
 }
 
 ;(async () => {
@@ -243,6 +250,30 @@ async function runViewport(browser, width, height, pass) {
       fullPage: true,
     });
     await baselineContext.close();
+
+    const zhContext = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    const zhPage = await zhContext.newPage();
+    await zhPage.goto(url, { waitUntil: "networkidle" });
+    await zhPage.evaluate(() => localStorage.setItem("game_locale", "zh"));
+    await zhPage.reload({ waitUntil: "networkidle" });
+    await zhPage.addStyleTag({ content: "#alteru-guest-banner{display:none!important}" });
+    await zhPage.evaluate(() => {
+      document.querySelector(".sd-hint").classList.add("is-gone");
+      window.__SPLATTERDRIFT__.engine.finish("time");
+    });
+    await zhPage.waitForTimeout(80);
+    const zhReplay = await zhPage.locator(".sd-replay").boundingBox();
+    assert.ok(zhReplay && zhReplay.width >= 44 && zhReplay.height >= 44);
+    assert.equal(await zhPage.locator(".sd-replay span").textContent(), "再次入轨");
+    await zhPage.screenshot({
+      path: path.join(root, `_qa/ui/${pass}-platform-layout-result-zh-390x844.png`),
+      fullPage: true,
+    });
+    await zhContext.close();
 
     const externalContext = await browser.newContext({
       viewport: { width: 390, height: 844 },

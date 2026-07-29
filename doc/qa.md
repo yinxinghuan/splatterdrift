@@ -26,8 +26,9 @@ Chromium 移动上下文使用 `Input.dispatchTouchEvent`：
 - 制动：`vx 120 → 约 57.1`，`brakeEvents 0 → 1`，制动涡旋被消费。
 - 390×844 和 320×568：`scrollY=0`，无横向溢出，场地完全在视口内。
 - 命中证据中活跃粒子分别为 43 与 31；连续尾迹分别达到 28 与 18 个采样点。
-- 14 个同时命中的标准档压力注入达到 420 粒子硬上限，p95 帧间隔 9ms；窄屏
-  8 个同时命中峰值 153 粒子，p95 约 9.3ms，均低于 28ms 自动化门限。
+- 14 个同时命中的标准档压力注入达到 420 粒子硬上限；窄屏 8 个同时命中峰值
+  稳定在 150–160 粒子。两档 p95 帧间隔均不超过 9.3ms，低于 28ms 自动化门限。
+- 结算按钮点击后两档均回到 `ready`，结果层隐藏，没有重复触发或残留状态。
 - 结果重开按钮在两种尺寸均不小于 44×44px。
 - `?baseline=1` 真触摸后存在弹丸、粒子或残留节点。
 
@@ -39,6 +40,7 @@ Chromium 移动上下文使用 `Input.dispatchTouchEvent`：
 - `particle-final-platform-layout-hit-390x844.png`
 - `particle-final-platform-layout-brake-390x844.png`
 - `particle-final-platform-layout-result-390x844.png`
+- `particle-final-platform-layout-result-zh-390x844.png`
 - `particle-final-platform-layout-idle-320x568.png`
 - `particle-final-platform-layout-hit-320x568.png`
 - `particle-final-platform-layout-brake-320x568.png`

@@ -312,38 +312,84 @@ button {
 }
 
 .sd-replay {
-  min-height: 48px;
-  border: 1px solid var(--sd-paper);
-  padding: 0 16px;
+  position: relative;
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid rgba(120, 215, 229, 0.52);
+  padding: 0 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  color: #11161a;
-  background: var(--sd-paper);
-  font-size: 15px;
-  font-weight: 850;
+  gap: 12px;
+  overflow: hidden;
+  color: var(--sd-paper);
+  background: rgba(120, 215, 229, 0.035);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
   cursor: pointer;
   touch-action: manipulation;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 120ms ease;
+}
+
+.sd-replay::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  content: "";
+  background: var(--sd-ion, #78d7e5);
 }
 
 .sd-replay svg {
-  width: 20px;
+  width: 36px;
   height: 20px;
+  flex: 0 0 auto;
   fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
+  stroke: #78d7e5;
+  stroke-width: 1.35;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .sd-replay:active {
   transform: translateY(1px);
+  border-color: #78d7e5;
+  color: #11161a;
+  background: #78d7e5;
+}
+
+.sd-replay:active svg {
+  stroke: #11161a;
+}
+
+.sd-replay:active .sd-replay__recoil {
+  transform: translateX(-2px);
+}
+
+.sd-replay:active .sd-replay__shot {
+  transform: translateX(2px);
 }
 
 .sd-replay:focus-visible {
-  outline: 2px solid var(--sd-paper);
+  outline: 2px solid #78d7e5;
   outline-offset: 3px;
+}
+
+.sd-replay__recoil,
+.sd-replay__shot {
+  transition: transform 140ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sd-replay,
+  .sd-replay__recoil,
+  .sd-replay__shot {
+    transition-duration: 0.01ms;
+  }
 }
 
 .sd-unsupported {
