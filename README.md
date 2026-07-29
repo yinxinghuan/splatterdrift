@@ -5,8 +5,9 @@ Visual mechanism adapted from **“css splatters (click for craze)”** by
 MIT License. See `public/THIRD_PARTY_NOTICES.txt`.
 
 A 45-second touch-first Asteroids variant where firing is the only propulsion.
-Hits leave collectible brake blooms that cut momentum, turning the splatter field
-into a tactical route map.
+The product layer uses a pooled Canvas particle field: recoil draws the route,
+directional hit debris exposes impact, and collectible particle vortices cut
+momentum. The original DOM/CSS mechanism remains isolated at `?baseline=1`.
 
 ## Local development
 

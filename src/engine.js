@@ -179,7 +179,14 @@ export class SplatterdriftEngine {
     this.metrics.shots += 1;
     this.shotsSinceHit += 1;
     if (this.shotsSinceHit >= 6) this.combo = 1;
-    this.events.push({ type: "shot", x: this.ship.x, y: this.ship.y, hue: colorHue });
+    this.events.push({
+      type: "shot",
+      x: this.ship.x,
+      y: this.ship.y,
+      nx,
+      ny,
+      speed: Math.hypot(this.ship.vx, this.ship.vy),
+    });
   }
 
   advance(delta) {
@@ -275,7 +282,8 @@ export class SplatterdriftEngine {
           type: "hit",
           x: bullet.x,
           y: bullet.y,
-          hue: bullet.hue,
+          nx: bullet.vx / Math.max(1, Math.hypot(bullet.vx, bullet.vy)),
+          ny: bullet.vy / Math.max(1, Math.hypot(bullet.vx, bullet.vy)),
           tier: asteroid.tier,
           combo: this.combo,
           bloomId: bloom.id,
@@ -315,7 +323,7 @@ export class SplatterdriftEngine {
       this.score += 75 * this.combo;
       this.metrics.brakeEvents += 1;
       this.lastHitAt += 0.6;
-      this.events.push({ type: "brake", x: bloom.x, y: bloom.y, hue: bloom.hue, bloomId: bloom.id });
+      this.events.push({ type: "brake", x: bloom.x, y: bloom.y, bloomId: bloom.id });
     }
     if (collected.length) this.blooms = this.blooms.filter((bloom) => !collected.includes(bloom.id));
   }

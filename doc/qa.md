@@ -2,8 +2,8 @@
 
 ## 结论
 
-纵向切片已通过确定性机械验证、390×844 / 320×568 真触摸自动化、platform-layout
-构图复验、结果按钮尺寸、DOM 对象上限、基线路由和静态 UI 审计。当前结论只支持继续
+粒子重构版已通过确定性机械验证、390×844 / 320×568 真触摸自动化、platform-layout
+构图复验、结果按钮尺寸、粒子预算、连续帧、基线路由和静态 UI 审计。当前结论只支持继续
 真人试玩，不构成发布验收；正式海报、平台 UUID、真机音频/震动和外部访客状态尚未完成。
 
 ## 机械验证
@@ -11,8 +11,8 @@
 `npm run verify` 通过：
 
 - 向右射击产生向左反冲，触屏单位方向在飞船移动后保持稳定。
-- 大岩体命中后分裂为两个小岩体，并生成一个权威制动花。
-- 穿过制动花把速度从 120 降到约 57，记录主动制动并加分。
+- 大岩体命中后分裂为两个小岩体，并生成一个权威制动涡旋。
+- 穿过制动涡旋把速度从 120 降到约 57，记录主动制动并加分。
 - 飞船碰撞扣除 1 点完整度。
 - 30fps 与 60fps 在相同输入下的飞船位置、岩体数和射击数一致。
 - 45 秒后进入 time 状态。
@@ -23,23 +23,39 @@ Chromium 移动上下文使用 `Input.dispatchTouchEvent`：
 
 - 按下 25ms：`shots=0`、`held=false`、`aimMode=direction`，预瞄与误射分离。
 - 长按：产生 2 发并命中 1 次；松手后 `held=false`。
-- 制动：`vx 120 → 约 57.1`，`brakeEvents 0 → 1`，制动花被消费。
+- 制动：`vx 120 → 约 57.1`，`brakeEvents 0 → 1`，制动涡旋被消费。
 - 390×844 和 320×568：`scrollY=0`，无横向溢出，场地完全在视口内。
-- 活跃 DOM 对象分别约 20 与 14，低于 180/110 门限。
+- 命中证据中活跃粒子分别为 43 与 31；连续尾迹分别达到 28 与 18 个采样点。
+- 14 个同时命中的标准档压力注入达到 420 粒子硬上限，p95 帧间隔 9ms；窄屏
+  8 个同时命中峰值 153 粒子，p95 约 9.3ms，均低于 28ms 自动化门限。
 - 结果重开按钮在两种尺寸均不小于 44×44px。
 - `?baseline=1` 真触摸后存在弹丸、粒子或残留节点。
 
 最终证据：
 
-- `final-platform-layout-idle-390x844.png`
-- `final-platform-layout-hit-390x844.png`
-- `final-platform-layout-brake-390x844.png`
-- `final-platform-layout-result-390x844.png`
-- `final-platform-layout-idle-320x568.png`
-- `final-platform-layout-hit-320x568.png`
-- `final-platform-layout-brake-320x568.png`
-- `final-platform-layout-result-320x568.png`
-- `final-baseline-390x844.png`
+- `particle-final-platform-layout-idle-390x844.png`
+- `particle-final-platform-layout-motion-a-390x844.png`
+- `particle-final-platform-layout-motion-b-390x844.png`
+- `particle-final-platform-layout-hit-390x844.png`
+- `particle-final-platform-layout-brake-390x844.png`
+- `particle-final-platform-layout-result-390x844.png`
+- `particle-final-platform-layout-idle-320x568.png`
+- `particle-final-platform-layout-hit-320x568.png`
+- `particle-final-platform-layout-brake-320x568.png`
+- `particle-final-platform-layout-result-320x568.png`
+- `particle-final-baseline-390x844.png`
+
+## 本轮视觉重构
+
+### 用户反馈：颜色俗气、缺少粒子主体、运动不流畅
+
+- 原因：产品层沿用了高饱和循环色和双圆环制动花；实际粒子数量少、寿命短，并以
+  多个 DOM 节点逐帧更新，效果像附加装饰，没有持续说明反冲与速度。
+- 修复：产品层重建为单 Canvas 2D；只保留石墨、暖白、离子青和危险珊瑚色；
+  射击产生反向压力尘，飞船保留真实历史尾迹，命中沿冲击方向生成火花/碎片，
+  制动目标改为切向粒子涡旋，吸收时向飞船收束。
+- 性能：使用固定对象池、DPR 上限和窄屏/低动态分档；视觉事件不参与权威碰撞。
+- 复验：双尺寸真触摸、连续运动帧、命中、吸收、结果及峰值粒子压力均通过。
 
 ## 发现与修复
 
@@ -73,10 +89,10 @@ Chromium 移动上下文使用 `Input.dispatchTouchEvent`：
 | 维度 | 分数 | 证据 |
 |---|---:|---|
 | 层级 | 4 | 飞船/岩体为主，HUD 安静，结果层单一主动作 |
-| 一致性 | 4 | 米白轮廓、切角岩体、DOM 墨色与无卡片 HUD |
+| 一致性 | 4 | 石墨底、暖白轮廓、离子青能量与珊瑚危险色 |
 | 可读性 | 4 | 双尺寸无溢出，状态不只靠颜色 |
-| 手感 | 4 | 同帧预瞄、反冲、命中、制动和碰撞层级明确 |
-| 素材质量 | 4 | 无外部素材拼贴；SVG/DOM 同一形状语言 |
+| 手感 | 4 | 同帧预瞄、真实路径尾迹、方向命中、制动收束层级明确 |
+| 素材质量 | 4 | 无外部素材拼贴；Canvas 粒子与几何轮廓同一形状语言 |
 | 响应式 | 4 | 360×520 权威场地缩放，短屏删减辅助信息 |
 | 完成度 | 3 | 纵向切片完整，但未做真机音频/震动和正式发布 |
 

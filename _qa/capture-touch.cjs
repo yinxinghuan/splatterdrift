@@ -91,17 +91,33 @@ async function runViewport(browser, width, height, pass) {
     return { shots: engine.metrics.shots, held: engine.held, aimMode: engine.aimMode };
   });
   assert.deepEqual(beforeArm, { shots: 0, held: false, aimMode: "direction" });
-  await page.waitForTimeout(280);
+  await page.waitForTimeout(105);
+  if (width === 390) {
+    await page.screenshot({
+      path: path.join(root, `_qa/ui/${pass}-platform-layout-motion-a-${width}x${height}.png`),
+      fullPage: true,
+    });
+  }
+  await page.waitForTimeout(85);
+  if (width === 390) {
+    await page.screenshot({
+      path: path.join(root, `_qa/ui/${pass}-platform-layout-motion-b-${width}x${height}.png`),
+      fullPage: true,
+    });
+  }
+  await page.waitForTimeout(90);
   await dispatchTouch(client, "touchEnd", start.x, start.y);
   await page.waitForTimeout(130);
   const playState = await page.evaluate(() => {
     const engine = window.__SPLATTERDRIFT__.engine;
+    const renderer = window.__SPLATTERDRIFT__.renderer;
     return {
       shots: engine.metrics.shots,
       hits: engine.metrics.hits,
       blooms: engine.blooms.length,
       held: engine.held,
-      domObjects: document.querySelectorAll(".sd-world > *").length,
+      particleCount: renderer.particleCount,
+      trailSamples: renderer.trail.length,
       scrollY,
     };
   });
@@ -110,7 +126,9 @@ async function runViewport(browser, width, height, pass) {
   assert.ok(playState.blooms >= 1);
   assert.equal(playState.held, false);
   assert.equal(playState.scrollY, 0);
-  assert.ok(playState.domObjects < 180);
+  assert.ok(playState.particleCount > 0);
+  assert.ok(playState.particleCount <= (width <= 320 ? 220 : 420));
+  assert.ok(playState.trailSamples >= 2);
   await page.screenshot({
     path: path.join(root, `_qa/ui/${pass}-platform-layout-hit-${width}x${height}.png`),
     fullPage: true,
@@ -158,9 +176,42 @@ async function runViewport(browser, width, height, pass) {
     fullPage: true,
   });
 
+  const stress = await page.evaluate(async ({ compact }) => {
+    const renderer = window.__SPLATTERDRIFT__.renderer;
+    renderer.process(Array.from({ length: compact ? 8 : 14 }, (_, index) => ({
+      type: "hit",
+      x: 80 + (index % 5) * 50,
+      y: 120 + (index % 7) * 42,
+      nx: index % 2 ? 0.8 : -0.8,
+      ny: index % 3 ? 0.45 : -0.45,
+      tier: index % 2 ? 1 : 2,
+    })));
+    const peakParticleCount = renderer.particleCount;
+    const deltas = [];
+    await new Promise((resolve) => {
+      let previous = performance.now();
+      const sample = (now) => {
+        deltas.push(now - previous);
+        previous = now;
+        if (deltas.length >= 90) resolve();
+        else requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    });
+    const sorted = deltas.slice(5).sort((a, b) => a - b);
+    return {
+      peakParticleCount,
+      particleCount: renderer.particleCount,
+      medianMs: sorted[Math.floor(sorted.length * 0.5)],
+      p95Ms: sorted[Math.floor(sorted.length * 0.95)],
+    };
+  }, { compact: width <= 320 });
+  assert.ok(stress.peakParticleCount <= (width <= 320 ? 220 : 420));
+  assert.ok(stress.p95Ms < 28, `p95 frame interval ${stress.p95Ms}ms is too high`);
+
   assert.deepEqual(errors, []);
   await context.close();
-  return { width, height, beforeArm, playState, beforeBrake, afterBrake, metrics };
+  return { width, height, beforeArm, playState, beforeBrake, afterBrake, stress, metrics };
 }
 
 ;(async () => {
@@ -206,7 +257,6 @@ async function runViewport(browser, width, height, pass) {
       path: path.join(root, `_qa/ui/${pass}-external-guest-idle-390x844.png`),
       fullPage: true,
     });
-    console.log("externalField", externalField);
     assert.ok(externalField && externalField.y + externalField.height > 0 && externalField.y < 844);
     await externalContext.close();
     console.log(JSON.stringify(results, null, 2));

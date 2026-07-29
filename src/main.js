@@ -5,7 +5,7 @@
 import "./style.css";
 import "./vendor/recoil-splatter-field.css";
 import { SplatterdriftEngine, FIELD_H, FIELD_W } from "./engine.js";
-import { DomRenderer } from "./renderer.js";
+import { CanvasRenderer } from "./renderer.js";
 import { RecoilSplatterField } from "./vendor/recoil-splatter-field.js";
 import { splatterAudio } from "./audio.js";
 import { t } from "./i18n.js";
@@ -46,7 +46,7 @@ function startProduct() {
       </header>
       <section class="sd-field" tabindex="0" aria-label="${t("hint")}">
         <div class="sd-grid" aria-hidden="true"></div>
-        <div class="sd-world" aria-hidden="true"></div>
+        <canvas class="sd-canvas" aria-hidden="true"></canvas>
         <div class="sd-combo" aria-live="polite"></div>
         <div class="sd-hint">
           <strong>${t("hint")}</strong>
@@ -79,13 +79,13 @@ function startProduct() {
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches
     || matchMedia("(max-width: 340px)").matches;
   const field = app.querySelector(".sd-field");
-  const world = app.querySelector(".sd-world");
+  const canvas = app.querySelector(".sd-canvas");
   const hint = app.querySelector(".sd-hint");
   const combo = app.querySelector(".sd-combo");
   const result = app.querySelector(".sd-result");
   const replay = app.querySelector(".sd-replay");
   const engine = new SplatterdriftEngine(90317, { bloomLimit: reduced ? 8 : 12 });
-  const renderer = new DomRenderer(world, engine, { reduced });
+  const renderer = new CanvasRenderer(canvas, engine, { reduced });
   const touch = { session: null };
   let previous = performance.now();
   let hudAt = 0;
@@ -93,13 +93,6 @@ function startProduct() {
 
   const stat = (name) => app.querySelector(`[data-stat="${name}"]`);
   const resultValue = (name) => app.querySelector(`[data-result="${name}"]`);
-
-  function syncFieldScale() {
-    field.style.setProperty("--field-scale", String(field.clientWidth / FIELD_W));
-  }
-  syncFieldScale();
-  const resizeObserver = new ResizeObserver(syncFieldScale);
-  resizeObserver.observe(field);
 
   function pointFromEvent(event) {
     const rect = field.getBoundingClientRect();
@@ -304,7 +297,6 @@ function startProduct() {
   frame = requestAnimationFrame(loop);
   window.addEventListener("pagehide", () => {
     cancelAnimationFrame(frame);
-    resizeObserver.disconnect();
   }, { once: true });
   window.__SPLATTERDRIFT__ = { baseline: false, engine, renderer, field };
 }
