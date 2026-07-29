@@ -1,0 +1,124 @@
+# SPLATTERDRIFT 纵向切片 QA
+
+## 结论
+
+成长与排行榜版已通过确定性机械验证、390×844 / 320×568 真触摸自动化、
+platform-layout 构图、external-guest 覆盖、排行榜 bridge、跨用户资料跳转、超分通知、
+结果按钮尺寸、粒子预算、连续帧、基线路由和静态 UI 审计。正式海报也已按 1024 原图与
+160 缩略图复验。浏览器自动化仍不能替代 iOS / Android 真机音频、震动和长期网络波动测试。
+
+## 机械验证
+
+`npm run verify` 通过：
+
+- 向右射击产生向左反冲，触屏单位方向在飞船移动后保持稳定。
+- 大岩体命中后分裂为两个小岩体，并生成一个权威制动涡旋。
+- 穿过制动涡旋把速度从 120 降到约 57，记录主动制动并加分。
+- 飞船碰撞扣除 1 点完整度。
+- CORE `×4` 为双发且反冲高于 `×1`；CORE `×3` 单发可穿透两个对齐小目标。
+- 第一波清场后保持 650ms 无射击切换，再生成 5 个目标的第二波。
+- 30fps 与 60fps 在相同输入下的飞船位置、岩体数和射击数一致。
+- 45 秒后进入 time 状态。
+
+## 触摸与运行证据
+
+Chromium 移动上下文使用 `Input.dispatchTouchEvent`：
+
+- 按下 25ms：`shots=0`、`held=false`、`aimMode=direction`，预瞄与误射分离。
+- 长按：产生 2 发并命中 1 次；松手后 `held=false`。
+- 制动：`vx 120 → 约 57.1`，`brakeEvents 0 → 1`，制动涡旋被消费。
+- 390×844 和 320×568：`scrollY=0`，无横向溢出，场地完全在视口内。
+- 命中证据中活跃粒子分别为 43 与 31；连续尾迹分别达到 28 与 18 个采样点。
+- 14 个同时命中的标准档压力注入达到 420 粒子硬上限；窄屏 8 个同时命中峰值
+  稳定在 150–160 粒子。两档 p95 帧间隔均不超过 9.3ms，低于 28ms 自动化门限。
+- 结算按钮点击后两档均回到 `ready`，结果层隐藏，没有重复触发或残留状态。
+- 结果重开按钮在两种尺寸均不小于 44×44px。
+- `?baseline=1` 真触摸后存在弹丸、粒子或残留节点。
+- 模拟 AlterU bridge 下，冠军入口与完整榜均显示；两个他人行可点、当前玩家只显示
+  `YOU`；点击他人准确发出 `AW.PROFILE.OPEN`。
+- 从 200 分旧快照打到 1000 分后只产生 1 个 `score_beat`，目标为原 900 分冠军；
+  未可靠取到开局榜时不发送推断式超分通知。
+- 平台外完整榜显示 AlterU 下载入口，不显示伪造排行榜；真实 external guest 状态保留
+  访客栏且冠军入口隐藏。
+
+上一轮粒子基线证据：
+
+- `particle-final-platform-layout-idle-390x844.png`
+- `particle-final-platform-layout-motion-a-390x844.png`
+- `particle-final-platform-layout-motion-b-390x844.png`
+- `particle-final-platform-layout-hit-390x844.png`
+- `particle-final-platform-layout-brake-390x844.png`
+- `particle-final-platform-layout-result-390x844.png`
+- `particle-final-platform-layout-result-zh-390x844.png`
+- `particle-final-platform-layout-idle-320x568.png`
+- `particle-final-platform-layout-hit-320x568.png`
+- `particle-final-platform-layout-brake-320x568.png`
+- `particle-final-platform-layout-result-320x568.png`
+- `particle-final-baseline-390x844.png`
+
+成长与排行榜预验收证据使用 `growth-board-first-*` 前缀；最终发布证据使用
+`growth-board-final-*` 前缀，覆盖两种尺寸的 CORE ×4、扇区切换、结算、排行榜、
+中文结果、基线和 external guest。
+
+## 本轮视觉重构
+
+### 用户反馈：颜色俗气、缺少粒子主体、运动不流畅
+
+- 原因：产品层沿用了高饱和循环色和双圆环制动花；实际粒子数量少、寿命短，并以
+  多个 DOM 节点逐帧更新，效果像附加装饰，没有持续说明反冲与速度。
+- 修复：产品层重建为单 Canvas 2D；只保留石墨、暖白、离子青和危险珊瑚色；
+  射击产生反向压力尘，飞船保留真实历史尾迹，命中沿冲击方向生成火花/碎片，
+  制动目标改为切向粒子涡旋，吸收时向飞船收束。
+- 性能：使用固定对象池、DPR 上限和窄屏/低动态分档；视觉事件不参与权威碰撞。
+- 复验：双尺寸真触摸、连续运动帧、命中、吸收、结果及峰值粒子压力均通过。
+
+## 发现与修复
+
+### P1：触摸 focus 导致高屏页面滚动
+
+- 首轮：部分 390×844 hit/brake 截图在触摸后标题离开视口。
+- 影响：真机游戏中 HUD 可能漂移，玩家失去计时与完整度信息。
+- 修复：触摸不再获取键盘焦点；游戏 `#app` 根层固定到视口；键盘/鼠标焦点路径保留。
+- 复验：两个尺寸完成相同触摸序列后 `scrollY=0`，matched 截图标题稳定。
+
+### P2：ready 岩体初始裁切
+
+- 首轮：6 个岩体中有两个初始生成在环绕边缘，只显示半个。
+- 影响：首帧容易读成布局裁切错误，而不是经典环绕。
+- 修复：首轮生成半径从 `152–210` 收到 `136–154`，开始后仍正常环绕。
+- 复验：两个尺寸 ready 均完整显示 6 个岩体。
+
+### QA harness：隐藏访客栏后残留滚动
+
+- 首轮 platform 截图隐藏 external guest banner 后没有重置 scroll。
+- 修复只存在于 QA harness：注入隐藏样式后 `scrollTo(0,0)`；生产代码保留 guest shell。
+
+### external-guest 发布检查
+
+- `final-external-guest-idle-390x844.png` 保留真实访客栏。
+- 访客栏覆盖顶部标题/HUD 的一部分，但场地、飞船、岩体和首轮教学仍可见且可操作。
+- 按项目门禁不据此下移 platform-layout；平台内主构图继续以无访客栏证据为准。
+
+### 正式海报
+
+- 生成：Aigram transit `POST /aigram/api/gen-image`，请求带
+  `Origin: https://aigram.app`；来源记录见 `_production/poster-source.json`。
+- 1024×1024：标题位于上方安全区，撞击、双发和粒子后坐力为单一主体；无 HUD、按钮、
+  设备框、额外文字、注册符号、彩虹或紫色赛道。
+- 160×160：标题仍可读，飞船、岩体冲突与青色后坐力路径仍可辨。
+- 未使用 ComfyUI、本地 workflow、SVG/Canvas 栅格化或游戏截图。
+
+## UI 与视觉评分
+
+| 维度 | 分数 | 证据 |
+|---|---:|---|
+| 层级 | 4 | 飞船/岩体为主，HUD 安静，结果层单一主动作 |
+| 一致性 | 4 | 石墨底、暖白轮廓、离子青能量与珊瑚危险色 |
+| 可读性 | 4 | 双尺寸无溢出，状态不只靠颜色 |
+| 手感 | 4 | 同帧预瞄、真实路径尾迹、方向命中、制动收束层级明确 |
+| 素材质量 | 4 | 无外部素材拼贴；Canvas 粒子与几何轮廓同一形状语言 |
+| 响应式 | 4 | 360×520 权威场地缩放，短屏删减辅助信息 |
+| 完成度 | 4 | 成长、榜单、身份降级、正式海报与发布配置完整；真机音频/震动仍属上线后观察 |
+
+平均 `4.0`，无低于 3 的类别。满足浏览器侧发布门槛；上线后重点观察真机射击音画同步、
+长局网络榜单刷新和高压机型的粒子分档。
