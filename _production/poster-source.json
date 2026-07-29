@@ -1,0 +1,14 @@
+{
+  "endpoint": "https://chat.aiwaves.tech/aigram/api/gen-image",
+  "origin": "https://aigram.app",
+  "generated_at": "2026-07-29T08:34:40.437485+00:00",
+  "generated_url": "https://cdn.aiwaves.tech/prod/telegram/avatar/0/1785314073087781.webp",
+  "prompt": "Edit this square SPLATTERDRIFT key art. Preserve the exact title spelling,\nthe strong asteroid impact, the central ring spacecraft, the twin cyan blast,\nthe warm-white rock fragments, and the immediate recoil conflict.\n\nReplace the entire purple road, rainbow stripe, track markings, lower “60”,\nbarcode-like marks, and all scenery beneath the craft with deep graphite-black\nopen space containing only restrained fine ivory dust and a subtle curved cyan\nparticle recoil wake. Remove the coral warning-sign icon and coral coral-like\nplant. Remove the registered trademark symbol after the title. Remove every\nnumber, symbol, icon, logo, watermark, and all text except the single exact\ntitle “SPLATTERDRIFT”.\n\nMake the result sophisticated editorial science fiction: graphite near-black,\nwarm-white mineral forms, restrained cyan energy, a tiny amount of muted coral\nonly on the craft, tactile fine particles, subtle film grain. Absolutely no\npurple-blue cyberpunk gradient, rainbow, neon road, game UI, score, timer,\nwarning sign, glossy mobile-game look, or extra decoration.\n\nKeep the exact title large and perfectly legible in the top 20 percent. Keep\nthe craft, asteroid impact, and twin-shot conflict inside the central 60\npercent so they remain unmistakable at 160x160. Reconstruct the bottom 20\npercent as quiet dark open space and nonessential dust only. Full bleed to all\nfour edges; no frame, device, interface, button, HUD, or border.",
+  "ref_url": "https://cdn.aiwaves.tech/prod/telegram/avatar/0/1785313986924247.webp",
+  "response": {
+    "url": "https://cdn.aiwaves.tech/prod/telegram/avatar/0/1785314073087781.webp"
+  },
+  "output": "public/poster.png",
+  "source": "_production/poster-source.webp",
+  "notes": "Aigram transit raster generation; no ComfyUI, SVG, Canvas, or gameplay screenshot."
+}
