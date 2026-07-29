@@ -1,0 +1,88 @@
+const copy = {
+  zh: {
+    title: "SPLATTERDRIFT",
+    eyebrow: "溅迹漂移",
+    time: "秒",
+    integrity: "完整度",
+    targets: "场上",
+    score: "分",
+    hint: "朝哪里射，就往反方向漂",
+    hintBrake: "穿过粒子涡旋，立刻消除惯性",
+    won: "轨道清空",
+    failed: "完整度归零",
+    timeEnd: "漂移结束",
+    cleared: "清除",
+    accuracy: "命中",
+    maxCombo: "最高连击",
+    brakes: "主动制动",
+    best: "最高分",
+    replay: "再次入轨",
+    core: "核心",
+    sector: "区域",
+    sectors: "完成区域",
+    leaders: "排行榜",
+    viewLeaderboard: "查看排行榜",
+    openLeaderboard: "打开排行榜",
+    leaderboardTitle: "漂移排行",
+    leaderboardSub: "最高轨道分数",
+    leaderboardEmpty: "还没有轨道记录，成为第一个。",
+    leaderboardError: "排行榜暂时无法连接。",
+    leaderboardAlterU: "在 AlterU 中打开即可查看排行榜并参与竞争。",
+    getAlterU: "下载 AlterU",
+    close: "关闭",
+    you: "你",
+    openProfile: "打开个人主页：",
+    notifyBeat: "{sender_name} 刚刚超过了你的纪录：",
+    points: "分",
+    unsupported: "当前浏览器不支持 Pointer Events，无法安全运行这款触控游戏。",
+  },
+  en: {
+    title: "SPLATTERDRIFT",
+    eyebrow: "RECOIL ORBIT",
+    time: "SEC",
+    integrity: "HULL",
+    targets: "FIELD",
+    score: "SCORE",
+    hint: "Fire one way. Drift the other.",
+    hintBrake: "Cross a particle vortex to cut your momentum.",
+    won: "ORBIT CLEARED",
+    failed: "HULL LOST",
+    timeEnd: "DRIFT COMPLETE",
+    cleared: "CLEARED",
+    accuracy: "ACCURACY",
+    maxCombo: "MAX CHAIN",
+    brakes: "BRAKES",
+    best: "BEST",
+    replay: "RE-ENTER ORBIT",
+    core: "CORE",
+    sector: "SECTOR",
+    sectors: "SECTORS",
+    leaders: "LEADERS",
+    viewLeaderboard: "VIEW LEADERS",
+    openLeaderboard: "Open leaderboard",
+    leaderboardTitle: "DRIFT LEADERS",
+    leaderboardSub: "Highest orbital scores",
+    leaderboardEmpty: "No orbital records yet. Set the first one.",
+    leaderboardError: "The leaderboard is temporarily unavailable.",
+    leaderboardAlterU: "Open in AlterU to view the leaderboard and compete.",
+    getAlterU: "Get AlterU",
+    close: "CLOSE",
+    you: "YOU",
+    openProfile: "Open profile:",
+    notifyBeat: "{sender_name} just broke past your record —",
+    points: "pts",
+    unsupported: "This browser does not support Pointer Events, so touch control cannot run safely.",
+  },
+};
+
+export function detectLocale() {
+  const override = localStorage.getItem("game_locale");
+  if (override === "zh" || override === "en") return override;
+  return navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
+const locale = detectLocale();
+
+export function t(key) {
+  return copy[locale][key] ?? key;
+}
